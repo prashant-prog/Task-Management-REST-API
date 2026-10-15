@@ -1,0 +1,28 @@
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+extend-exclude = [
+    "alembic/versions",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "B008", # allow Depends in argument defaults (standard FastAPI pattern)
+]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+filterwarnings = [
+    "ignore::starlette.testclient.StarletteDeprecationWarning",
+]

@@ -1,0 +1,35 @@
+# Python virtual environment
+.venv/
+env/
+venv/
+ENV/
+
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Linting & type checking
+.ruff_cache/
+.mypy_cache/
+
+# Environment variables & secrets (CRITICAL: never commit .env)
+.env
+
+# IDE / Editor folders
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Operating system files
+.DS_Store
+Thumbs.db
