@@ -119,9 +119,10 @@ def test_list_tasks_isolation() -> None:
         headers={"Authorization": f"Bearer {token_a}"},
     )
     assert res_a.status_code == 200
-    tasks_a = res_a.json()
-    assert len(tasks_a) == 2
-    assert all("User A" in t["title"] for t in tasks_a)
+    data_a = res_a.json()
+    assert data_a["total"] == 2
+    assert len(data_a["items"]) == 2
+    assert all("User A" in t["title"] for t in data_a["items"])
 
     # Verify User B only sees their 1 task
     res_b = client.get(
@@ -129,9 +130,10 @@ def test_list_tasks_isolation() -> None:
         headers={"Authorization": f"Bearer {token_b}"},
     )
     assert res_b.status_code == 200
-    tasks_b = res_b.json()
-    assert len(tasks_b) == 1
-    assert tasks_b[0]["title"] == "User B - Task 1"
+    data_b = res_b.json()
+    assert data_b["total"] == 1
+    assert len(data_b["items"]) == 1
+    assert data_b["items"][0]["title"] == "User B - Task 1"
 
 
 def test_update_task() -> None:
