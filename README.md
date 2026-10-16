@@ -157,8 +157,8 @@ DEBUG=True
 DATABASE_URL="postgresql+psycopg://task_user:task_password@localhost:5432/task_db"
 TEST_DATABASE_URL="postgresql+psycopg://task_user:task_password@localhost:5432/task_test_db"
 
-# Generate a secure key using: openssl rand -hex 32
-SECRET_KEY="c8651a56e0766e4a29a4a75ee7b40d04fbe7d558d197609200aa9d3e5aa595ec"
+# Generate a secure key in terminal using: openssl rand -hex 32
+SECRET_KEY="replace-this-with-a-secure-random-secret-key"
 ALGORITHM="HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 ```
