@@ -106,9 +106,7 @@ def list_tasks(
         order_expr = sort_column.desc().nulls_last()
 
     # 5. Apply sorting, limit, and offset
-    paginated_query = (
-        base_query.order_by(order_expr).limit(limit).offset(offset)
-    )
+    paginated_query = base_query.order_by(order_expr).limit(limit).offset(offset)
     tasks = list(db.execute(paginated_query).scalars().all())
 
     return PaginatedTaskResponse(

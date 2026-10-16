@@ -86,6 +86,4 @@ class Task(Base):
     owner: Mapped["User"] = relationship(back_populates="tasks")
 
     def __repr__(self) -> str:
-        return (
-            f"<Task id={self.id} title={self.title!r} status={self.status.value}>"
-        )
+        return f"<Task id={self.id} title={self.title!r} status={self.status.value}>"
