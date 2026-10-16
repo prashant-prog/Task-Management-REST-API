@@ -1,14 +1,21 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user
 from app.core.database import get_db
-from app.models.task import Task
+from app.models.task import Task, TaskPriority, TaskStatus
 from app.models.user import User
-from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate
+from app.schemas.task import (
+    PaginatedTaskResponse,
+    SortOrder,
+    TaskCreate,
+    TaskResponse,
+    TaskSortField,
+    TaskUpdate,
+)
 
 router = APIRouter()
 
@@ -41,22 +48,75 @@ def create_task(
 
 @router.get(
     "/",
-    response_model=list[TaskResponse],
+    response_model=PaginatedTaskResponse,
     status_code=status.HTTP_200_OK,
     summary="List Tasks",
-    description="Retrieve all tasks owned by the authenticated user.",
+    description=(
+        "Retrieve tasks owned by the authenticated user with filtering, "
+        "sorting, and pagination."
+    ),
 )
 def list_tasks(
     current_user: Annotated[User, Depends(get_current_active_user)],
     db: Annotated[Session, Depends(get_db)],
-) -> list[Task]:
-    """Return all tasks belonging strictly to the current user."""
-    query = (
-        select(Task)
-        .where(Task.user_id == current_user.id)
-        .order_by(Task.created_at.desc())
+    status: Annotated[
+        TaskStatus | None,
+        Query(description="Filter tasks by status"),
+    ] = None,
+    priority: Annotated[
+        TaskPriority | None,
+        Query(description="Filter tasks by priority"),
+    ] = None,
+    sort_by: Annotated[
+        TaskSortField,
+        Query(description="Sort field ('created_at' or 'due_date')"),
+    ] = TaskSortField.CREATED_AT,
+    order: Annotated[
+        SortOrder,
+        Query(description="Sort direction ('asc' or 'desc')"),
+    ] = SortOrder.DESC,
+    limit: Annotated[
+        int,
+        Query(ge=1, le=100, description="Max items per page (1-100)"),
+    ] = 10,
+    offset: Annotated[
+        int,
+        Query(ge=0, description="Number of items to skip"),
+    ] = 0,
+) -> PaginatedTaskResponse:
+    """Return paginated, filtered, and sorted tasks for the current user."""
+    # 1. Base query filtered strictly by authenticated user
+    base_query = select(Task).where(Task.user_id == current_user.id)
+
+    # 2. Dynamic filters
+    if status is not None:
+        base_query = base_query.where(Task.status == status)
+    if priority is not None:
+        base_query = base_query.where(Task.priority == priority)
+
+    # 3. Compute total matching records count before pagination
+    count_query = select(func.count()).select_from(base_query.subquery())
+    total = db.execute(count_query).scalar_one()
+
+    # 4. Sorting with predictable NULL handling
+    sort_column = getattr(Task, sort_by.value)
+    if order == SortOrder.ASC:
+        order_expr = sort_column.asc().nulls_last()
+    else:
+        order_expr = sort_column.desc().nulls_last()
+
+    # 5. Apply sorting, limit, and offset
+    paginated_query = (
+        base_query.order_by(order_expr).limit(limit).offset(offset)
     )
-    return list(db.execute(query).scalars().all())
+    tasks = list(db.execute(paginated_query).scalars().all())
+
+    return PaginatedTaskResponse(
+        items=tasks,
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get(
