@@ -1,35 +1,12 @@
 from datetime import timedelta
 
-import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.database import SessionLocal
 from app.core.security import create_access_token
-from app.main import app
-from app.models.task import Task
-from app.models.user import User
-
-client = TestClient(app)
 
 
-@pytest.fixture(autouse=True)
-def clean_database():
-    """Clean up users and tasks tables before and after each test."""
-    session: Session = SessionLocal()
-    session.query(Task).delete()
-    session.query(User).delete()
-    session.commit()
-    yield
-    session.rollback()
-    session.query(Task).delete()
-    session.query(User).delete()
-    session.commit()
-    session.close()
-
-
-def test_register_user_success() -> None:
+def test_register_user_success(client: TestClient) -> None:
     """Verify that a user can register successfully with valid credentials."""
     response = client.post(
         f"{settings.API_V1_STR}/auth/register",
@@ -45,7 +22,7 @@ def test_register_user_success() -> None:
     assert "hashed_password" not in data
 
 
-def test_register_duplicate_email_fails() -> None:
+def test_register_duplicate_email_fails(client: TestClient) -> None:
     """Verify that registering with an already existing email returns HTTP 400."""
     payload = {"email": "duplicate@example.com", "password": "password123"}
     # First registration succeeds
@@ -58,7 +35,7 @@ def test_register_duplicate_email_fails() -> None:
     assert "already exists" in response2.json()["detail"]
 
 
-def test_register_validation_error_short_password() -> None:
+def test_register_validation_error_short_password(client: TestClient) -> None:
     """Verify that passwords shorter than 8 characters fail with HTTP 422."""
     response = client.post(
         f"{settings.API_V1_STR}/auth/register",
@@ -67,7 +44,7 @@ def test_register_validation_error_short_password() -> None:
     assert response.status_code == 422
 
 
-def test_login_success() -> None:
+def test_login_success(client: TestClient) -> None:
     """Verify that a registered user can log in and receive a valid JWT token."""
     # Register user first
     client.post(
@@ -86,7 +63,7 @@ def test_login_success() -> None:
     assert data["token_type"] == "bearer"
 
 
-def test_login_invalid_password_fails() -> None:
+def test_login_invalid_password_fails(client: TestClient) -> None:
     """Verify that login fails with HTTP 401 when password is wrong."""
     client.post(
         f"{settings.API_V1_STR}/auth/register",
@@ -101,7 +78,7 @@ def test_login_invalid_password_fails() -> None:
     assert "Incorrect email or password" in response.json()["detail"]
 
 
-def test_get_current_user_me_endpoint() -> None:
+def test_get_current_user_me_endpoint(client: TestClient) -> None:
     """Verify protected endpoint returns user details with valid Bearer token."""
     reg_response = client.post(
         f"{settings.API_V1_STR}/auth/register",
@@ -127,14 +104,14 @@ def test_get_current_user_me_endpoint() -> None:
     assert me_data["email"] == "me@example.com"
 
 
-def test_protected_route_missing_token_fails() -> None:
+def test_protected_route_missing_token_fails(client: TestClient) -> None:
     """Verify that accessing protected route without a token returns HTTP 401."""
     response = client.get(f"{settings.API_V1_STR}/auth/me")
     assert response.status_code == 401
     assert response.json()["detail"] == "Not authenticated"
 
 
-def test_protected_route_invalid_token_fails() -> None:
+def test_protected_route_invalid_token_fails(client: TestClient) -> None:
     """Verify that accessing protected route with a tampered token returns HTTP 401."""
     response = client.get(
         f"{settings.API_V1_STR}/auth/me",
@@ -144,7 +121,7 @@ def test_protected_route_invalid_token_fails() -> None:
     assert "Could not validate credentials" in response.json()["detail"]
 
 
-def test_protected_route_expired_token_fails() -> None:
+def test_protected_route_expired_token_fails(client: TestClient) -> None:
     """Verify that accessing protected route with an expired token returns HTTP 401."""
     # Register user
     reg_response = client.post(

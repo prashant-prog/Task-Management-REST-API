@@ -5,22 +5,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.database import SessionLocal
 from app.models.task import Task, TaskPriority, TaskStatus
 from app.models.user import User
-
-
-@pytest.fixture
-def db_session():
-    """Provide a transactional session for testing models with cleanup."""
-    session: Session = SessionLocal()
-    yield session
-    # Cleanup after test: clean users (cascades to tasks)
-    session.rollback()
-    session.query(Task).delete()
-    session.query(User).delete()
-    session.commit()
-    session.close()
 
 
 def test_create_user_and_task_relationship(db_session: Session) -> None:

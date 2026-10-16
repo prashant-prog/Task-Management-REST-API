@@ -1,34 +1,11 @@
 from datetime import UTC, datetime, timedelta
 
-import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.database import SessionLocal
-from app.main import app
-from app.models.task import Task
-from app.models.user import User
-
-client = TestClient(app)
 
 
-@pytest.fixture(autouse=True)
-def clean_database():
-    """Clean up database tables before and after each test."""
-    session: Session = SessionLocal()
-    session.query(Task).delete()
-    session.query(User).delete()
-    session.commit()
-    yield
-    session.rollback()
-    session.query(Task).delete()
-    session.query(User).delete()
-    session.commit()
-    session.close()
-
-
-def get_token(email: str = "queryuser@example.com") -> str:
+def get_token(client: TestClient, email: str = "queryuser@example.com") -> str:
     """Helper to register and login a test user."""
     client.post(
         f"{settings.API_V1_STR}/auth/register",
@@ -41,7 +18,7 @@ def get_token(email: str = "queryuser@example.com") -> str:
     return login_res.json()["access_token"]
 
 
-def seed_tasks(token: str) -> None:
+def seed_tasks(client: TestClient, token: str) -> None:
     """Seed a variety of tasks for querying tests."""
     headers = {"Authorization": f"Bearer {token}"}
     now = datetime.now(UTC)
@@ -88,10 +65,10 @@ def seed_tasks(token: str) -> None:
         assert res.status_code == 201
 
 
-def test_filter_by_status() -> None:
+def test_filter_by_status(client: TestClient) -> None:
     """Verify filtering tasks by status."""
-    token = get_token("filter_status@example.com")
-    seed_tasks(token)
+    token = get_token(client, "filter_status@example.com")
+    seed_tasks(client, token)
 
     res = client.get(
         f"{settings.API_V1_STR}/tasks/?status=pending",
@@ -103,10 +80,10 @@ def test_filter_by_status() -> None:
     assert all(t["status"] == "pending" for t in data["items"])
 
 
-def test_filter_by_priority() -> None:
+def test_filter_by_priority(client: TestClient) -> None:
     """Verify filtering tasks by priority."""
-    token = get_token("filter_priority@example.com")
-    seed_tasks(token)
+    token = get_token(client, "filter_priority@example.com")
+    seed_tasks(client, token)
 
     res = client.get(
         f"{settings.API_V1_STR}/tasks/?priority=high",
@@ -118,10 +95,10 @@ def test_filter_by_priority() -> None:
     assert all(t["priority"] == "high" for t in data["items"])
 
 
-def test_combined_filters() -> None:
+def test_combined_filters(client: TestClient) -> None:
     """Verify combining status and priority filters."""
-    token = get_token("combined@example.com")
-    seed_tasks(token)
+    token = get_token(client, "combined@example.com")
+    seed_tasks(client, token)
 
     res = client.get(
         f"{settings.API_V1_STR}/tasks/?status=completed&priority=high",
@@ -133,10 +110,10 @@ def test_combined_filters() -> None:
     assert data["items"][0]["title"] == "Task 3 - High/Completed"
 
 
-def test_sorting_by_due_date_predictable_nulls() -> None:
+def test_sorting_by_due_date_predictable_nulls(client: TestClient) -> None:
     """Verify sorting by due_date ascending places null due dates at the end."""
-    token = get_token("sort_due@example.com")
-    seed_tasks(token)
+    token = get_token(client, "sort_due@example.com")
+    seed_tasks(client, token)
 
     res = client.get(
         f"{settings.API_V1_STR}/tasks/?sort_by=due_date&order=asc",
@@ -150,10 +127,10 @@ def test_sorting_by_due_date_predictable_nulls() -> None:
     assert items[0]["title"] == "Task 2 - High/In Progress"
 
 
-def test_pagination_limit_and_offset() -> None:
+def test_pagination_limit_and_offset(client: TestClient) -> None:
     """Verify pagination limit and offset slices correctly."""
-    token = get_token("pagination@example.com")
-    seed_tasks(token)
+    token = get_token(client, "pagination@example.com")
+    seed_tasks(client, token)
 
     # Fetch page 1 (limit 2, offset 0)
     page1 = client.get(
@@ -180,9 +157,9 @@ def test_pagination_limit_and_offset() -> None:
     assert set(page1_ids).isdisjoint(set(page2_ids))
 
 
-def test_invalid_query_parameters_validation() -> None:
+def test_invalid_query_parameters_validation(client: TestClient) -> None:
     """Verify that invalid query parameters return HTTP 422."""
-    token = get_token("invalid_queries@example.com")
+    token = get_token(client, "invalid_queries@example.com")
     headers = {"Authorization": f"Bearer {token}"}
 
     # Invalid status

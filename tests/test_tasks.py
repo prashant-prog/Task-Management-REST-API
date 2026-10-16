@@ -1,32 +1,11 @@
-import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.database import SessionLocal
-from app.main import app
-from app.models.task import Task
-from app.models.user import User
-
-client = TestClient(app)
 
 
-@pytest.fixture(autouse=True)
-def clean_database():
-    """Clean up database tables before and after each test."""
-    session: Session = SessionLocal()
-    session.query(Task).delete()
-    session.query(User).delete()
-    session.commit()
-    yield
-    session.rollback()
-    session.query(Task).delete()
-    session.query(User).delete()
-    session.commit()
-    session.close()
-
-
-def get_auth_token_for_user(email: str, password: str = "password123") -> str:
+def get_auth_token_for_user(
+    client: TestClient, email: str, password: str = "password123"
+) -> str:
     """Helper fixture to register, log in, and return a JWT access token."""
     client.post(
         f"{settings.API_V1_STR}/auth/register",
@@ -39,9 +18,9 @@ def get_auth_token_for_user(email: str, password: str = "password123") -> str:
     return login_res.json()["access_token"]
 
 
-def test_create_task_authenticated() -> None:
+def test_create_task_authenticated(client: TestClient) -> None:
     """Verify that an authenticated user can create a task."""
-    token = get_auth_token_for_user("owner@example.com")
+    token = get_auth_token_for_user(client, "owner@example.com")
     response = client.post(
         f"{settings.API_V1_STR}/tasks/",
         headers={"Authorization": f"Bearer {token}"},
@@ -62,7 +41,7 @@ def test_create_task_authenticated() -> None:
     assert "user_id" in data
 
 
-def test_create_task_unauthenticated_fails() -> None:
+def test_create_task_unauthenticated_fails(client: TestClient) -> None:
     """Verify that creating a task without token returns HTTP 401."""
     response = client.post(
         f"{settings.API_V1_STR}/tasks/",
@@ -71,9 +50,9 @@ def test_create_task_unauthenticated_fails() -> None:
     assert response.status_code == 401
 
 
-def test_get_single_task() -> None:
+def test_get_single_task(client: TestClient) -> None:
     """Verify that the owner can retrieve their own task by ID."""
-    token = get_auth_token_for_user("user1@example.com")
+    token = get_auth_token_for_user(client, "user1@example.com")
     create_res = client.post(
         f"{settings.API_V1_STR}/tasks/",
         headers={"Authorization": f"Bearer {token}"},
@@ -89,10 +68,10 @@ def test_get_single_task() -> None:
     assert get_res.json()["title"] == "Read SQLAlchemy documentation"
 
 
-def test_list_tasks_isolation() -> None:
+def test_list_tasks_isolation(client: TestClient) -> None:
     """Verify that users can list only their own tasks."""
-    token_a = get_auth_token_for_user("user_a@example.com")
-    token_b = get_auth_token_for_user("user_b@example.com")
+    token_a = get_auth_token_for_user(client, "user_a@example.com")
+    token_b = get_auth_token_for_user(client, "user_b@example.com")
 
     # User A creates 2 tasks
     client.post(
@@ -136,9 +115,9 @@ def test_list_tasks_isolation() -> None:
     assert data_b["items"][0]["title"] == "User B - Task 1"
 
 
-def test_update_task() -> None:
+def test_update_task(client: TestClient) -> None:
     """Verify that a task can be partially updated."""
-    token = get_auth_token_for_user("updater@example.com")
+    token = get_auth_token_for_user(client, "updater@example.com")
     create_res = client.post(
         f"{settings.API_V1_STR}/tasks/",
         headers={"Authorization": f"Bearer {token}"},
@@ -163,9 +142,9 @@ def test_update_task() -> None:
     assert updated_data["title"] == "Draft blog post"
 
 
-def test_delete_task() -> None:
+def test_delete_task(client: TestClient) -> None:
     """Verify that a task can be deleted by its owner."""
-    token = get_auth_token_for_user("deleter@example.com")
+    token = get_auth_token_for_user(client, "deleter@example.com")
     create_res = client.post(
         f"{settings.API_V1_STR}/tasks/",
         headers={"Authorization": f"Bearer {token}"},
@@ -187,10 +166,12 @@ def test_delete_task() -> None:
     assert get_res.status_code == 404
 
 
-def test_ownership_enforcement_cannot_view_others_task() -> None:
+def test_ownership_enforcement_cannot_view_others_task(
+    client: TestClient,
+) -> None:
     """Verify that User B cannot retrieve User A's task (returns 404)."""
-    token_a = get_auth_token_for_user("alice@example.com")
-    token_b = get_auth_token_for_user("bob@example.com")
+    token_a = get_auth_token_for_user(client, "alice@example.com")
+    token_b = get_auth_token_for_user(client, "bob@example.com")
 
     # Alice creates a task
     create_res = client.post(
@@ -209,10 +190,12 @@ def test_ownership_enforcement_cannot_view_others_task() -> None:
     assert get_res.json()["detail"] == "Task not found"
 
 
-def test_ownership_enforcement_cannot_update_others_task() -> None:
+def test_ownership_enforcement_cannot_update_others_task(
+    client: TestClient,
+) -> None:
     """Verify that User B cannot update User A's task (returns 404)."""
-    token_a = get_auth_token_for_user("alice2@example.com")
-    token_b = get_auth_token_for_user("bob2@example.com")
+    token_a = get_auth_token_for_user(client, "alice2@example.com")
+    token_b = get_auth_token_for_user(client, "bob2@example.com")
 
     # Alice creates a task
     create_res = client.post(
@@ -238,10 +221,12 @@ def test_ownership_enforcement_cannot_update_others_task() -> None:
     assert alice_res.json()["title"] == "Original Title"
 
 
-def test_ownership_enforcement_cannot_delete_others_task() -> None:
+def test_ownership_enforcement_cannot_delete_others_task(
+    client: TestClient,
+) -> None:
     """Verify that User B cannot delete User A's task (returns 404)."""
-    token_a = get_auth_token_for_user("alice3@example.com")
-    token_b = get_auth_token_for_user("bob3@example.com")
+    token_a = get_auth_token_for_user(client, "alice3@example.com")
+    token_b = get_auth_token_for_user(client, "bob3@example.com")
 
     # Alice creates a task
     create_res = client.post(
