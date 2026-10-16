@@ -1,8 +1,23 @@
+import enum
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.task import TaskPriority, TaskStatus
+
+
+class TaskSortField(enum.StrEnum):
+    """Permitted fields for sorting tasks."""
+
+    CREATED_AT = "created_at"
+    DUE_DATE = "due_date"
+
+
+class SortOrder(enum.StrEnum):
+    """Permitted sort directions."""
+
+    ASC = "asc"
+    DESC = "desc"
 
 
 class TaskBase(BaseModel):
@@ -79,3 +94,12 @@ class TaskResponse(TaskBase):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PaginatedTaskResponse(BaseModel):
+    """Envelope schema for paginated list of tasks."""
+
+    items: list[TaskResponse] = Field(..., description="List of tasks for current page")
+    total: int = Field(..., ge=0, description="Total count of matching tasks")
+    limit: int = Field(..., ge=1, description="Page limit applied")
+    offset: int = Field(..., ge=0, description="Page offset applied")
