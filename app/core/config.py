@@ -14,6 +14,11 @@ class Settings(BaseSettings):
         "postgresql+psycopg://task_user:task_password@localhost:5432/task_db"
     )
 
+    # Dedicated Test Database configuration
+    TEST_DATABASE_URL: str = (
+        "postgresql+psycopg://task_user:task_password@localhost:5432/task_test_db"
+    )
+
     # JWT Authentication configuration
     SECRET_KEY: str = "default-insecure-secret-key-change-me"
     ALGORITHM: str = "HS256"
