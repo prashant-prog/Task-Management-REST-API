@@ -203,3 +203,70 @@ def test_invalid_query_parameters_validation(client: TestClient) -> None:
         headers=headers,
     )
     assert res6.status_code == 422
+
+
+def test_deterministic_pagination_with_colliding_sort_values(
+    client: TestClient,
+) -> None:
+    """Verify deterministic pagination ordering when tasks share identical sort values.
+
+    Without a deterministic tie-breaker (like Task.id), database engines can return
+    arbitrary orderings across LIMIT/OFFSET slices when sort keys collide.
+    """
+    token = get_token(client, "deterministic_sort@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    identical_due_date = (datetime.now(UTC) + timedelta(days=3)).isoformat()
+
+    created_ids: list[int] = []
+    for i in range(6):
+        res = client.post(
+            f"{settings.API_V1_STR}/tasks/",
+            headers=headers,
+            json={
+                "title": f"Colliding Task {i}",
+                "due_date": identical_due_date,
+            },
+        )
+        assert res.status_code == 201
+        created_ids.append(res.json()["id"])
+
+    # 1. Test ASC sort with collision: tie-breaker should sort Task.id ASC
+    p1_asc = client.get(
+        f"{settings.API_V1_STR}/tasks/?sort_by=due_date&order=asc&limit=3&offset=0",
+        headers=headers,
+    ).json()
+    p2_asc = client.get(
+        f"{settings.API_V1_STR}/tasks/?sort_by=due_date&order=asc&limit=3&offset=3",
+        headers=headers,
+    ).json()
+
+    p1_asc_ids = [t["id"] for t in p1_asc["items"]]
+    p2_asc_ids = [t["id"] for t in p2_asc["items"]]
+
+    # Verify each page is strictly ascending by ID
+    assert p1_asc_ids == sorted(p1_asc_ids)
+    assert p2_asc_ids == sorted(p2_asc_ids)
+    # Verify no page drift / overlap
+    assert set(p1_asc_ids).isdisjoint(set(p2_asc_ids))
+    assert p1_asc_ids + p2_asc_ids == sorted(created_ids)
+
+    # 2. Test DESC sort with collision: tie-breaker should sort Task.id DESC
+    p1_desc = client.get(
+        f"{settings.API_V1_STR}/tasks/?sort_by=due_date&order=desc&limit=3&offset=0",
+        headers=headers,
+    ).json()
+    p2_desc = client.get(
+        f"{settings.API_V1_STR}/tasks/?sort_by=due_date&order=desc&limit=3&offset=3",
+        headers=headers,
+    ).json()
+
+    p1_desc_ids = [t["id"] for t in p1_desc["items"]]
+    p2_desc_ids = [t["id"] for t in p2_desc["items"]]
+
+    # Verify each page is strictly descending by ID
+    assert p1_desc_ids == sorted(p1_desc_ids, reverse=True)
+    assert p2_desc_ids == sorted(p2_desc_ids, reverse=True)
+    # Verify no page drift / overlap
+    assert set(p1_desc_ids).isdisjoint(set(p2_desc_ids))
+    assert p1_desc_ids + p2_desc_ids == sorted(created_ids, reverse=True)
+

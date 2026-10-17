@@ -271,7 +271,7 @@ Execute the full test suite using Pytest. Tests run in complete isolation agains
 pytest -v
 ```
 
-All 31 tests covering database connectivity, session lifecycles, model relationships, unique email constraints, cascade deletes, registration, login, JWT validation, expiration, CRUD operations, IDOR ownership isolation, filtering, sorting, and pagination will execute and pass.
+All 32 tests covering database connectivity, session lifecycles, model relationships, unique email constraints, cascade deletes, registration, login, JWT validation, expiration, CRUD operations, IDOR ownership isolation, filtering, sorting, and pagination will execute and pass.
 
 ### Linting and Code Formatting
 Check and format Python code using Ruff:

@@ -98,15 +98,19 @@ def list_tasks(
     count_query = select(func.count()).select_from(base_query.subquery())
     total = db.execute(count_query).scalar_one()
 
-    # 4. Sorting with predictable NULL handling
+    # 4. Sorting with predictable NULL handling and deterministic tie-breaker
     sort_column = getattr(Task, sort_by.value)
     if order == SortOrder.ASC:
         order_expr = sort_column.asc().nulls_last()
+        tie_breaker = Task.id.asc()
     else:
         order_expr = sort_column.desc().nulls_last()
+        tie_breaker = Task.id.desc()
 
     # 5. Apply sorting, limit, and offset
-    paginated_query = base_query.order_by(order_expr).limit(limit).offset(offset)
+    paginated_query = (
+        base_query.order_by(order_expr, tie_breaker).limit(limit).offset(offset)
+    )
     tasks = list(db.execute(paginated_query).scalars().all())
 
     return PaginatedTaskResponse(

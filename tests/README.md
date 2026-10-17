@@ -155,6 +155,7 @@ Tests query parameters, SQL expression generation, and edge cases:
 | `test_combined_filters` | Tests composite filters with `?status=completed&priority=high`. |
 | `test_sorting_by_due_date_predictable_nulls` | Tests ascending sort on deadline with `.nulls_last()`: tasks with defined deadlines appear first; tasks with `null` deadlines appear strictly at the end. |
 | `test_pagination_limit_and_offset` | Tests page slicing: verifies `limit`, `offset`, `total`, and ensures Page 1 and Page 2 have disjoint ID sets. |
+| `test_deterministic_pagination_with_colliding_sort_values` | Tests stable pagination when sort keys collide: verifies `Task.id` secondary tie-breaker prevents page drift and duplicates. |
 | `test_invalid_query_parameters_validation` | Tests Pydantic query validation: invalid status, invalid priority, invalid sort field, invalid sort order, `limit > 100`, and `offset < 0` all return `HTTP 422`. |
 
 ---
